@@ -1,10 +1,11 @@
-import json
+from urllib.parse import urlparse
 
 import pandas as pd
 import requests
 import streamlit as st
 
 API_BASE = "http://localhost:8000"
+EXPECTED_HEALTH_FIELDS = {"status", "model"}
 
 st.set_page_config(page_title="LocalData Agent", page_icon="📊")
 
@@ -15,7 +16,27 @@ st.markdown(
 
 with st.sidebar:
     st.header("Settings")
-    api_url = st.text_input("Backend URL", value=API_BASE)
+    raw_url = st.text_input("Backend URL", value=API_BASE)
+
+    parsed = urlparse(raw_url.rstrip("/"))
+    api_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}" if parsed.scheme else raw_url.rstrip("/")
+    analyze_url = f"{api_url}/analyze"
+
+    st.caption(f"Endpoint: `{analyze_url}`")
+
+    try:
+        r = requests.get(f"{api_url}/health", timeout=5)
+        if r.status_code == 200:
+            body = r.json()
+            if EXPECTED_HEALTH_FIELDS.issubset(body.keys()):
+                st.success(f"Backend connected (model: {body.get('model', '?')})")
+            else:
+                st.error(f"Port responds but is not the LocalData backend (unexpected response: {body})")
+        else:
+            st.error("Backend not reachable")
+    except requests.exceptions.RequestException:
+        st.error("Backend not reachable")
+
     st.divider()
     st.markdown("**Supported analysis types:**")
     st.markdown("- Summary")
@@ -77,7 +98,7 @@ if uploaded_file is not None:
 
             try:
                 resp = requests.post(
-                    f"{api_url}/analyze",
+                    analyze_url,
                     files=files,
                     data=data,
                     timeout=120,
@@ -85,7 +106,7 @@ if uploaded_file is not None:
                 resp.raise_for_status()
                 result = resp.json()
             except requests.exceptions.ConnectionError:
-                st.error(f"Cannot connect to backend at {api_url}. Make sure the backend is running.")
+                st.error(f"Cannot connect to backend at {analyze_url}. Make sure the backend is running.")
                 st.stop()
             except Exception as e:
                 st.error(f"Request failed: {e}")
