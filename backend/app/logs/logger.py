@@ -26,6 +26,7 @@ class JSONLLogger:
     def log_run(self, data: dict) -> None:
         entry = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
+            "mode": "template",
             "file_name": data.get("file_name"),
             "analysis_type": data.get("analysis_type"),
             "rows": data.get("rows"),
@@ -34,6 +35,24 @@ class JSONLLogger:
             "error": data.get("error"),
             "execution_time_seconds": data.get("execution_time_seconds"),
             "tool_used": "python_sandbox",
+        }
+        try:
+            with open(self.log_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(entry, default=str) + "\n")
+        except Exception as e:
+            logger.error("Failed to write log entry: %s", e)
+
+    def log_agent_run(self, data: dict) -> None:
+        entry = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "mode": "agent",
+            "file_name": data.get("file_name"),
+            "question": data.get("question"),
+            "selected_analysis_types": data.get("selected_analysis_types"),
+            "success": data.get("success", False),
+            "error": data.get("error"),
+            "execution_time_seconds": data.get("execution_time_seconds"),
+            "tool_used": "langgraph_agent",
         }
         try:
             with open(self.log_path, "a", encoding="utf-8") as f:

@@ -24,3 +24,16 @@ class AnalyzeResponse(BaseModel):
     steps: list[str] = []
     error: Optional[str] = None
     execution_time_seconds: Optional[float] = None
+
+
+class AgentAnalyzeResponse(BaseModel):
+    success: bool
+    question: str
+    file_name: Optional[str] = None
+    selected_analysis_types: list[str] = []
+    results: list[dict] = []
+    final_answer: Optional[str] = None
+    chart: Optional[dict] = None
+    steps: list[str] = []
+    error: Optional[str] = None
+    execution_time_seconds: Optional[float] = None

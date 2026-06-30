@@ -3,10 +3,11 @@ import logging
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.agent.graph import run_agent
 from app.analysis.csv_analyzer import CSVAnalyzer
 from app.config import settings
 from app.logs.logger import JSONLLogger
-from app.models.schemas import AnalyzeResponse
+from app.models.schemas import AgentAnalyzeResponse, AnalyzeResponse
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -55,5 +56,34 @@ async def analyze(
     result = csv_analyzer.analyze(contents, file.filename, analysis_type)
 
     jsonl_logger.log_run(result)
+
+    return result
+
+
+@app.post("/agent/analyze", response_model=AgentAnalyzeResponse)
+async def agent_analyze(
+    file: UploadFile = File(...),
+    question: str = Form(...),
+):
+    if not file.filename or not file.filename.endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Only CSV files are supported.")
+
+    if not question.strip():
+        raise HTTPException(status_code=400, detail="Question cannot be empty.")
+
+    try:
+        contents = await file.read()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to read uploaded file: {e}")
+
+    if len(contents) > settings.MAX_CSV_SIZE_MB * 1024 * 1024:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File exceeds maximum size of {settings.MAX_CSV_SIZE_MB}MB.",
+        )
+
+    result = run_agent(contents, file.filename, question)
+
+    jsonl_logger.log_agent_run(result)
 
     return result
