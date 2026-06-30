@@ -129,11 +129,11 @@ def _display_agent_result(result: dict):
                 tables = rd.get("tables") or {}
                 for tk, tv in tables.items():
                     if tv:
-                        with st.expander(f"{tk.replace('_', ' ').title()}"):
-                            if isinstance(tv, dict):
-                                st.json(tv)
-                            elif isinstance(tv, list):
-                                st.write(tv)
+                        st.markdown(f"**{tk.replace('_', ' ').title()}**")
+                        if isinstance(tv, dict):
+                            st.json(tv)
+                        elif isinstance(tv, list):
+                            st.write(tv)
 
                 insights = rd.get("insights") or []
                 if insights:
