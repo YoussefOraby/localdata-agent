@@ -1,0 +1,26 @@
+date,product,category,region,units_sold,unit_price,revenue,customers,marketing_channel,order_status
+2026-01-01,Laptop,Electronics,Cairo,20,500,10000,18,Facebook,Completed
+2026-01-15,Mouse,Accessories,Giza,50,20,1000,42,Google Ads,Completed
+2026-02-01,Keyboard,Accessories,Cairo,30,50,1500,25,Email,Completed
+2026-02-18,Monitor,Electronics,Alexandria,12,220,2640,10,Facebook,Completed
+2026-03-03,Laptop,Electronics,Cairo,25,500,12500,21,Google Ads,Completed
+2026-03-20,Mouse,Accessories,Alexandria,60,20,1200,50,Email,Completed
+2026-04-02,Keyboard,Accessories,Giza,35,50,1750,29,Facebook,Completed
+2026-04-15,Monitor,Electronics,Cairo,18,220,3960,15,Google Ads,Completed
+2026-05-01,Laptop,Electronics,Alexandria,8,500,4000,7,Email,Completed
+2026-05-12,Mouse,Accessories,Cairo,70,20,,55,Facebook,Completed
+2026-06-01,Keyboard,Accessories,Giza,40,50,2000,33,Google Ads,Completed
+2026-06-18,Monitor,Electronics,Cairo,15,220,3300,13,Email,Completed
+2026-07-01,Laptop,Electronics,Giza,30,500,15000,26,Facebook,Completed
+2026-07-22,Mouse,Accessories,Alexandria,65,20,1300,54,Google Ads,Completed
+2026-08-05,Keyboard,Accessories,Cairo,45,50,2250,38,Email,Completed
+2026-08-19,Monitor,Electronics,Giza,20,220,4400,17,Facebook,Completed
+2026-09-01,Laptop,Electronics,Cairo,35,500,17500,30,Google Ads,Completed
+2026-09-17,Mouse,Accessories,Giza,80,20,1600,66,Email,Completed
+2026-10-03,Keyboard,Accessories,Alexandria,50,50,2500,41,Facebook,Completed
+2026-10-20,Monitor,Electronics,Cairo,22,220,4840,19,Google Ads,Completed
+2026-11-01,Laptop,Electronics,Cairo,60,500,30000,52,Email,Completed
+2026-11-14,Mouse,Accessories,Giza,90,20,1800,75,Facebook,Completed
+2026-12-01,Keyboard,Accessories,Cairo,55,50,2750,45,Google Ads,Completed
+2026-12-19,Monitor,Electronics,Alexandria,25,220,5500,21,Email,Completed
+2026-12-25,Laptop,Electronics,Cairo,200,500,100000,160,Facebook,Completed
