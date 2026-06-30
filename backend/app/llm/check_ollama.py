@@ -15,12 +15,36 @@ def main():
     print(f"Available: {available}")
 
     if available:
-        print("✓ Ollama is running and reachable.")
+        print("[OK] Ollama is running and reachable.")
+        print()
+        try:
+            import ollama
+            ollama_client = ollama.Client(host=client.base_url)
+            models = ollama_client.list()
+            local_models = models.get("models", [])
+            if local_models:
+                print(f"Available local models ({len(local_models)}):")
+                for m in local_models:
+                    name = m.get("name", m.get("model", "?"))
+                    print(f"  - {name}")
+            else:
+                print("No models pulled yet. Run:")
+                print(f"  ollama pull {model}")
+                print(f"  ollama pull {client.fallback_model}")
+        except Exception:
+            print("Could not list models.")
     else:
-        print("✗ Ollama is not available.")
+        print("[FAIL] Ollama is not available.")
+        print()
         print("  Make sure Ollama is installed and running:")
         print("  https://ollama.com/download")
-        print(f"  Then pull the model: ollama pull {model}")
+        print()
+        print("  Then pull the recommended models:")
+        print(f"    ollama pull {model}")
+        print(f"    ollama pull {client.fallback_model}")
+        print()
+        print("  To verify installation:")
+        print("    ollama list")
 
 
 if __name__ == "__main__":
