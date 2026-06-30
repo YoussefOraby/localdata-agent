@@ -11,7 +11,7 @@ from collections import abc
 from dataclasses import dataclass, field
 from datetime import datetime
 from io import StringIO
-from typing import Optional
+from typing import Any, Optional
 
 _real_import = builtins.__import__
 
@@ -39,30 +39,6 @@ BLOCKED_IMPORTS = {
 
 DANGEROUS_BUILTINS = {"open", "exec", "eval", "compile", "input", "__import__"}
 
-SAFE_BUILTINS = {
-    "abs", "all", "any", "ascii", "bin", "bool", "bytearray", "bytes",
-    "callable", "chr", "complex", "dict", "dir", "divmod", "enumerate",
-    "filter", "float", "format", "frozenset", "getattr", "hasattr",
-    "hash", "hex", "id", "int", "isinstance", "issubclass", "iter",
-    "len", "list", "map", "max", "min", "next", "object", "oct",
-    "ord", "pow", "print", "property", "range", "repr", "reversed",
-    "round", "set", "setattr", "slice", "sorted", "staticmethod",
-    "str", "sum", "super", "tuple", "type", "vars", "zip",
-    "True", "False", "None",
-    "Exception", "ValueError", "TypeError", "KeyError", "IndexError",
-    "StopIteration", "RuntimeError", "AttributeError",
-    "ImportError", "ModuleNotFoundError", "ZeroDivisionError",
-    "ArithmeticError", "LookupError",
-    "len", "print", "range", "int", "float", "str", "bool", "list",
-    "dict", "set", "tuple", "type", "isinstance", "hasattr", "getattr",
-    "setattr", "sorted", "reversed", "enumerate", "zip", "map",
-    "filter", "min", "max", "sum", "any", "all", "abs", "round",
-    "pow", "chr", "ord", "hex", "oct", "bin", "format", "hash",
-    "id", "repr", "ascii", "complex", "bytes", "bytearray",
-    "frozenset", "property", "staticmethod", "slice", "super",
-    "object", "iter", "next",
-}
-
 
 @dataclass
 class SandboxResult:
@@ -71,6 +47,7 @@ class SandboxResult:
     stderr: str
     error: Optional[str] = None
     execution_time_seconds: float = 0.0
+    result: Any = None
 
 
 class ImportDenied(Exception):
@@ -87,13 +64,13 @@ class PythonSandbox:
     def __init__(self, timeout: Optional[int] = None):
         self.default_timeout = timeout or 30
 
-    def execute(self, code: str, timeout: Optional[int] = None) -> SandboxResult:
+    def execute(self, code: str, timeout: Optional[int] = None, context: Optional[dict] = None) -> SandboxResult:
         timeout = timeout or self.default_timeout
 
         parent_conn, child_conn = multiprocessing.Pipe(duplex=False)
         process = multiprocessing.Process(
             target=self._run_in_process,
-            args=(code, child_conn),
+            args=(code, child_conn, context or {}),
         )
 
         start = time.monotonic()
@@ -125,7 +102,7 @@ class PythonSandbox:
             execution_time_seconds=elapsed,
         )
 
-    def _run_in_process(self, code: str, conn):
+    def _run_in_process(self, code: str, conn, context: dict):
         try:
             self._validate_ast(code)
         except Exception as e:
@@ -141,6 +118,7 @@ class PythonSandbox:
             "compile": self._raise_blocked,
             "input": self._raise_blocked,
         }
+        safe_globals.update(context)
 
         stdout_capture = StringIO()
         stderr_capture = StringIO()
@@ -155,7 +133,8 @@ class PythonSandbox:
 
             out = stdout_capture.getvalue()[:self.MAX_OUTPUT_CHARS]
             err = stderr_capture.getvalue()[:self.MAX_OUTPUT_CHARS]
-            conn.send(SandboxResult(success=True, stdout=out, stderr=err))
+            result_value = safe_globals.get("result")
+            conn.send(SandboxResult(success=True, stdout=out, stderr=err, result=result_value))
         except Exception:
             out = stdout_capture.getvalue()[:self.MAX_OUTPUT_CHARS]
             err = stderr_capture.getvalue()[:self.MAX_OUTPUT_CHARS]
