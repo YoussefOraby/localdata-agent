@@ -84,3 +84,59 @@ def test_logger_handles_none_fields(temp_log_dir):
         entry = json.loads(f.readline())
     assert entry["error"] == "Something went wrong"
     assert entry["file_name"] is None
+
+
+def test_log_agent_entry_has_mode(temp_log_dir):
+    logger = JSONLLogger(log_dir=temp_log_dir)
+    data = {
+        "file_name": "test.csv",
+        "question": "summarize this",
+        "selected_analysis_types": ["summary"],
+        "success": True,
+        "error": None,
+        "execution_time_seconds": 0.5,
+        "sources": [],
+    }
+    logger.log_agent_run(data)
+    with open(logger.log_path, "r") as f:
+        entry = json.loads(f.readline())
+    assert entry["mode"] == "agent"
+    assert entry["question"] == "summarize this"
+
+
+def test_log_multi_agent_entry_has_mode(temp_log_dir):
+    logger = JSONLLogger(log_dir=temp_log_dir)
+    data = {
+        "file_name": "test.csv",
+        "question": "analyze this",
+        "agents_used": ["Data Analyst Agent"],
+        "selected_analysis_types": ["summary"],
+        "success": True,
+        "error": None,
+        "execution_time_seconds": 0.5,
+        "sources": [],
+    }
+    logger.log_multi_agent_run(data)
+    with open(logger.log_path, "r") as f:
+        entry = json.loads(f.readline())
+    assert entry["mode"] == "multi_agent"
+    assert entry["agents_used"] == ["Data Analyst Agent"]
+
+
+def test_no_csv_content_in_logs(temp_log_dir):
+    logger = JSONLLogger(log_dir=temp_log_dir)
+    data = {
+        "file_name": "test.csv",
+        "analysis_type": "summary",
+        "rows": 10,
+        "columns": 3,
+        "success": True,
+        "error": None,
+        "execution_time_seconds": 0.1,
+    }
+    logger.log_run(data)
+    with open(logger.log_path, "r") as f:
+        content = f.read()
+    assert "csv_content" not in content
+    assert "file_bytes" not in content
+    assert "raw data" not in content.lower()

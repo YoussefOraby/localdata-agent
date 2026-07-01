@@ -117,3 +117,26 @@ def test_unknown_analysis_type(analyzer, sample_csv_bytes):
     result = analyzer.analyze(sample_csv_bytes, "test.csv", "unknown_type")
     assert result["success"] is False
     assert "Unknown analysis type" in (result["error"] or "")
+
+
+def test_csv_with_duplicate_columns(analyzer):
+    csv_bytes = b"a,b,a,c\n1,2,3,4\n5,6,7,8"
+    result = analyzer.analyze(csv_bytes, "dup.csv", "summary")
+    assert result["success"] is True
+
+
+def test_csv_with_only_whitespace(analyzer):
+    result = analyzer.analyze(b"   \n  \n", "ws.csv", "summary")
+    assert result["success"] is False
+
+
+def test_empty_bytes_returns_error(analyzer):
+    result = analyzer.analyze(b"", "empty.csv", "summary")
+    assert result["success"] is False
+    assert "empty" in (result["error"] or "").lower()
+
+
+def test_malformed_csv_unclosed_quote(analyzer):
+    bad_bytes = b"col1,col2\nval1,\"unclosed"
+    result = analyzer.analyze(bad_bytes, "bad.csv", "summary")
+    assert result["success"] is False

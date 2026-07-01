@@ -147,3 +147,62 @@ print(datetime.now().year)
     result = sandbox.execute(code)
     assert result.success is True
     assert result.stdout.strip().isdigit()
+
+
+def test_large_stdout_captured(sandbox):
+    code = "result = 'x' * 500"
+    result = sandbox.execute(code, timeout=10)
+    assert result.success is True
+    assert len(result.result) == 500
+
+
+def test_context_cannot_override_security(sandbox):
+    code = """
+try:
+    open('test.txt')
+    result = False
+except Exception:
+    result = True
+"""
+    result = sandbox.execute(code, context={"open": "hacker_value"})
+    assert result.success is True
+    assert result.result is True, "open should be blocked even when context contains it"
+
+
+def test_context_dangerous_keys_filtered(sandbox):
+    code = """
+try:
+    eval('1+1')
+    result = False
+except Exception:
+    result = True
+"""
+    result = sandbox.execute(code, context={"eval": "hacker_value"})
+    assert result.success is True
+    assert result.result is True, "eval should be blocked even when context contains it"
+
+
+def test_blocked_exec(sandbox):
+    code = "exec('x = 1')"
+    result = sandbox.execute(code)
+    assert result.success is False
+
+
+def test_result_dict_serialized(sandbox):
+    code = """
+import numpy as np
+result = {
+    "int_val": np.int64(42),
+    "float_val": np.float64(3.14),
+    "bool_val": np.bool_(True),
+}
+"""
+    sandbox2 = PythonSandbox(timeout=5)
+    result = sandbox2.execute(code)
+    assert result.success is True
+    assert result.result["int_val"] == 42
+    assert isinstance(result.result["int_val"], int)
+    assert result.result["float_val"] == 3.14
+    assert isinstance(result.result["float_val"], float)
+    assert result.result["bool_val"] is True
+    assert isinstance(result.result["bool_val"], bool)

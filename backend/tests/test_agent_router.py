@@ -133,3 +133,33 @@ def test_route_question_summary_and_search():
     types, explanation = route_question("Summarize this dataset and search for latest market trends.")
     assert "summary" in types
     assert "web_search" in types
+
+
+def test_empty_question_defaults_to_summary():
+    types, explanation = route_question("")
+    assert types == ["summary"]
+    assert "empty" in explanation.lower()
+
+
+def test_whitespace_only_question_defaults_to_summary():
+    types, explanation = route_question("   \n  \t  ")
+    assert types == ["summary"]
+    assert "empty" in explanation.lower()
+
+
+def test_very_long_question_does_not_crash():
+    long_q = "summarize " + "data " * 500
+    types, explanation = route_question(long_q)
+    assert "summary" in types
+    assert isinstance(explanation, str)
+
+
+def test_search_keywords_trigger_web_search_without_llm():
+    types, explanation = route_question("search for current e-commerce trends")
+    assert "web_search" in types
+
+
+def test_combined_keywords_trigger_multiple():
+    types, explanation = route_question("find missing values and search for strategies")
+    assert "missing_outliers" in types
+    assert "web_search" in types

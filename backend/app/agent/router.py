@@ -26,7 +26,16 @@ SEARCH_TRIGGERS = {"search", "web", "online", "current", "recent", "latest", "tr
                     "strategies", "best practices", "external", "compare with market"}
 
 
+MAX_QUESTION_LENGTH = 2000
+
+
 def route_question(question: str, llm_client: Optional[OllamaClient] = None) -> tuple[list[str], str]:
+    if not question or not question.strip():
+        return ["summary"], "Empty question, defaulting to summary analysis."
+
+    if len(question) > MAX_QUESTION_LENGTH:
+        question = question[:MAX_QUESTION_LENGTH]
+
     llm_types = None
     llm_explanation = None
 

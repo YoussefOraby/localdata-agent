@@ -23,9 +23,61 @@ class CSVAnalyzer:
     def analyze(self, file_bytes: bytes, file_name: str, analysis_type: str) -> dict:
         steps = []
 
+        if not file_bytes or not file_bytes.strip():
+            return {
+                "success": False,
+                "analysis_type": analysis_type,
+                "file_name": file_name,
+                "rows": 0,
+                "columns": 0,
+                "column_names": [],
+                "result": None,
+                "explanation": "The uploaded file is empty.",
+                "chart": None,
+                "generated_code": None,
+                "steps": [],
+                "error": "Empty file.",
+                "execution_time_seconds": None,
+            }
+
         steps.append("Reading CSV file")
         try:
-            df = pd.read_csv(StringIO(file_bytes.decode("utf-8", errors="replace")))
+            decoded = file_bytes.decode("utf-8", errors="replace")
+            df = pd.read_csv(StringIO(decoded))
+            if df.columns.duplicated().any():
+                df = df.loc[:, ~df.columns.duplicated()]
+        except pd.errors.EmptyDataError:
+            return {
+                "success": False,
+                "analysis_type": analysis_type,
+                "file_name": file_name,
+                "rows": 0,
+                "columns": 0,
+                "column_names": [],
+                "result": None,
+                "explanation": "The CSV file is empty.",
+                "chart": None,
+                "generated_code": None,
+                "steps": steps,
+                "error": "Empty CSV file.",
+                "execution_time_seconds": None,
+            }
+        except pd.errors.ParserError as e:
+            return {
+                "success": False,
+                "analysis_type": analysis_type,
+                "file_name": file_name,
+                "rows": 0,
+                "columns": 0,
+                "column_names": [],
+                "result": None,
+                "explanation": f"Could not parse CSV: {e}",
+                "chart": None,
+                "generated_code": None,
+                "steps": steps,
+                "error": f"CSV parse error: {e}",
+                "execution_time_seconds": None,
+            }
         except Exception as e:
             return {
                 "success": False,

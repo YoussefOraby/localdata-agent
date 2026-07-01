@@ -39,6 +39,37 @@ BLOCKED_IMPORTS = {
 
 DANGEROUS_BUILTINS = {"open", "exec", "eval", "compile", "input", "__import__"}
 
+_SAFE_BUILTIN_NAMES = {
+    "abs", "all", "any", "ascii", "bin", "bool", "bytearray", "bytes",
+    "callable", "chr", "classmethod", "complex", "delattr", "dict",
+    "dir", "divmod", "enumerate", "filter", "float", "format",
+    "frozenset", "getattr", "globals", "hasattr", "hash", "hex", "id",
+    "int", "isinstance", "issubclass", "iter", "len", "list", "locals",
+    "map", "max", "min", "next", "object", "oct", "ord", "pow", "print",
+    "property", "range", "repr", "reversed", "round", "set", "slice",
+    "sorted", "staticmethod", "str", "sum", "super", "tuple", "type",
+    "vars", "zip",
+    "ArithmeticError", "AssertionError", "AttributeError", "BaseException",
+    "DeprecationWarning", "EOFError", "Exception", "FloatingPointError",
+    "GeneratorExit", "ImportError", "IndentationError", "IndexError",
+    "KeyError", "KeyboardInterrupt", "LookupError", "MemoryError",
+    "NameError", "NotImplementedError", "OSError", "OverflowError",
+    "RecursionError", "ReferenceError", "RuntimeError", "RuntimeWarning",
+    "StopIteration", "SyntaxError", "SystemError", "SystemExit",
+    "TabError", "TypeError", "UnboundLocalError", "UnicodeDecodeError",
+    "UnicodeEncodeError", "UnicodeError", "UnicodeTranslateError",
+    "ValueError", "Warning", "ZeroDivisionError",
+    "False", "True", "None", "Ellipsis", "NotImplemented",
+}
+
+
+def _build_safe_builtins() -> dict:
+    safe = {}
+    for name in _SAFE_BUILTIN_NAMES:
+        if hasattr(builtins, name):
+            safe[name] = getattr(builtins, name)
+    return safe
+
 
 @dataclass
 class SandboxResult:
@@ -109,16 +140,16 @@ class PythonSandbox:
             conn.send(SandboxResult(success=False, stdout="", stderr="", error=str(e)))
             return
 
-        safe_globals = {
-            "__builtins__": __builtins__,
-            "__import__": self._safe_import,
-            "open": self._raise_blocked,
-            "exec": self._raise_blocked,
-            "eval": self._raise_blocked,
-            "compile": self._raise_blocked,
-            "input": self._raise_blocked,
-        }
-        safe_globals.update(context)
+        context_safe = {k: v for k, v in context.items()
+                        if k not in {"__builtins__", "__import__"} and k not in DANGEROUS_BUILTINS}
+
+        safe_builtins = _build_safe_builtins()
+        safe_builtins["__import__"] = self._safe_import
+        safe_globals = {}
+        safe_globals.update(context_safe)
+        safe_globals["__builtins__"] = safe_builtins
+        for name in DANGEROUS_BUILTINS:
+            safe_globals[name] = self._raise_blocked
 
         stdout_capture = StringIO()
         stderr_capture = StringIO()
@@ -134,6 +165,7 @@ class PythonSandbox:
             out = stdout_capture.getvalue()[:self.MAX_OUTPUT_CHARS]
             err = stderr_capture.getvalue()[:self.MAX_OUTPUT_CHARS]
             result_value = safe_globals.get("result")
+            result_value = self._serialize_result(result_value)
             conn.send(SandboxResult(success=True, stdout=out, stderr=err, result=result_value))
         except Exception:
             out = stdout_capture.getvalue()[:self.MAX_OUTPUT_CHARS]
@@ -179,6 +211,38 @@ class PythonSandbox:
     @staticmethod
     def _raise_blocked(*args, **kwargs):
         raise RuntimeError("This built-in is disabled for security reasons.")
+
+    @staticmethod
+    def _serialize_result(val: Any) -> Any:
+        if val is None or isinstance(val, (bool, int, float, str)):
+            return val
+        if isinstance(val, dict):
+            return {k: PythonSandbox._serialize_result(v) for k, v in val.items()}
+        if isinstance(val, (list, tuple)):
+            return [PythonSandbox._serialize_result(v) for v in val]
+        try:
+            import numpy as np
+            if isinstance(val, np.integer):
+                return int(val)
+            if isinstance(val, np.floating):
+                return float(val)
+            if isinstance(val, np.bool_):
+                return bool(val)
+            if isinstance(val, np.ndarray):
+                return PythonSandbox._serialize_result(val.tolist())
+        except ImportError:
+            pass
+        try:
+            import pandas as pd
+            if isinstance(val, pd.Timestamp):
+                return str(val)
+            if isinstance(val, pd.Series):
+                return PythonSandbox._serialize_result(val.to_dict())
+            if isinstance(val, pd.DataFrame):
+                return PythonSandbox._serialize_result(val.to_dict(orient="records"))
+        except ImportError:
+            pass
+        return str(val)
 
     def _safe_import(self, name, *args, **kwargs):
         if name in BLOCKED_IMPORTS:
