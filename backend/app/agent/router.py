@@ -20,13 +20,34 @@ KEYWORD_RULES = [
 ]
 
 
+CANONICAL_ORDER = ["summary", "missing_outliers", "best_worst", "basic_chart", "web_search"]
+SEARCH_TRIGGERS = {"search", "web", "online", "current", "recent", "latest", "trend", "trends",
+                    "market trend", "industry trend", "e-commerce trend", "ecommerce trend",
+                    "strategies", "best practices", "external", "compare with market"}
+
+
 def route_question(question: str, llm_client: Optional[OllamaClient] = None) -> tuple[list[str], str]:
+    llm_types = None
+    llm_explanation = None
+
     if llm_client and llm_client.is_available():
         result = _try_llm_route(question, llm_client)
         if result is not None:
-            return result
+            llm_types, llm_explanation = result
 
-    return _keyword_route(question)
+    keyword_types, keyword_explanation = _keyword_route(question)
+
+    if llm_types is not None:
+        merged = _merge_types(llm_types, keyword_types)
+        return merged, llm_explanation or keyword_explanation
+
+    return keyword_types, keyword_explanation
+
+
+def _merge_types(base: list[str], additions: list[str]) -> list[str]:
+    combined = list(dict.fromkeys(base + additions))
+    ordered = [t for t in CANONICAL_ORDER if t in combined]
+    return ordered[:MAX_TYPES]
 
 
 def _try_llm_route(question: str, llm_client: OllamaClient):
@@ -82,7 +103,7 @@ def _keyword_route(question: str) -> tuple[list[str], str]:
                 matched.add(analysis_type)
                 break
 
-    ordered = [t for t in ["summary", "missing_outliers", "best_worst", "basic_chart", "web_search"] if t in matched]
+    ordered = [t for t in CANONICAL_ORDER if t in matched]
 
     if not ordered:
         ordered = ["summary"]

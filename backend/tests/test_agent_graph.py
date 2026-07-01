@@ -99,3 +99,41 @@ def test_clean_search_query_keeps_question_intent():
     from app.agent.graph import _clean_search_query
     result = _clean_search_query("search for current e-commerce growth trends")
     assert "e-commerce" in result or "growth" in result
+
+
+def test_chart_and_search_returns_both():
+    types, explanation = route_question("Show me a chart and search for current e-commerce trends.")
+    assert "basic_chart" in types
+    assert "web_search" in types
+    assert len(types) <= 4
+
+
+def test_search_only_question():
+    types, explanation = route_question("Search for current sales improvement strategies.")
+    assert "web_search" in types
+
+
+def test_summary_and_search():
+    types, explanation = route_question("Summarize this dataset and search for latest market trends.")
+    assert "summary" in types
+    assert "web_search" in types
+
+
+def test_clean_explanation_removes_dollar_signs():
+    from app.agent.graph import _clean_explanation
+    result = _clean_explanation("Revenue ranged from $20 to as high as $500 per item")
+    assert "$" not in result
+    assert "to" in result
+
+
+def test_clean_explanation_adds_spaces_around_numbers():
+    from app.agent.graph import _clean_explanation
+    result = _clean_explanation("20toashighas500")
+    assert "20 to" in result or "to as" in result or "as high" in result
+
+
+def test_clean_explanation_collapses_whitespace():
+    from app.agent.graph import _clean_explanation
+    result = _clean_explanation("hello    world")
+    assert "hello world" in result
+    assert "    " not in result

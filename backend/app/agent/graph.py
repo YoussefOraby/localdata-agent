@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 
 from langgraph.graph import END, StateGraph
@@ -91,6 +92,14 @@ def _run_analyses(state: AgentState) -> dict:
     }
 
 
+def _clean_explanation(text: str) -> str:
+    text = re.sub(r"\$", "", text)
+    text = re.sub(r"(?<=\d)(?=[a-zA-Z])", " ", text)
+    text = re.sub(r"(?<=[a-zA-Z])(?=\d)", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
 def _compose_answer(state: AgentState) -> dict:
     steps = state.steps[:]
 
@@ -101,30 +110,49 @@ def _compose_answer(state: AgentState) -> dict:
         return {"final_answer": "No analysis results were produced.", "steps": steps}
 
     lines = []
-    for r in state.results:
-        if r.get("success"):
-            explanation = r.get("explanation", "")
-            if explanation:
-                lines.append(explanation)
-        else:
-            atype = r.get("analysis_type", "unknown")
-            err = r.get("error", "unknown error")
-            lines.append(f"{atype} analysis failed: {err}")
+    has_dataset_insights = bool(state.results)
 
-    if state.search_results and any("error" not in r for r in state.search_results):
+    if has_dataset_insights:
+        lines.append("**Dataset insights**")
+        for r in state.results:
+            if r.get("success"):
+                explanation = r.get("explanation", "")
+                if explanation:
+                    clean = _clean_explanation(explanation)
+                    lines.append(f"- {clean}")
+            else:
+                atype = r.get("analysis_type", "unknown")
+                err = r.get("error", "unknown error")
+                lines.append(f"- {atype} analysis failed: {err}")
+
+    valid_results = []
+    if state.search_results:
         valid_results = [r for r in state.search_results if "error" not in r]
-        if valid_results:
-            lines.append("\n**Web context:**")
-            for r in valid_results[:3]:
-                snippet = (r.get("snippet") or "")[:200]
-                lines.append(f"- {r.get('title', '')}: {snippet}")
-            if state.search_query:
-                lines.append(f"\nSearch query used: {state.search_query}")
+
+    if valid_results:
+        lines.append("")
+        lines.append("**Web context**")
+        for r in valid_results[:3]:
+            snippet = (r.get("snippet") or "")[:200]
+            snippet = _clean_explanation(snippet)
+            lines.append(f"- {r.get('title', '')}: {snippet}")
+
+        if state.search_query:
+            lines.append("")
+            lines.append(f"*Search query used: `{state.search_query}`*")
+
+    search_used = "web_search" in (state.selected_analysis_types or [])
+    if search_used and not valid_results:
+        lines.append("")
+        lines.append("*Web search was unavailable, so the answer is based only on the uploaded CSV.*")
 
     if state.sources:
-        search_used = any("web_search" in s for s in (state.selected_analysis_types or []))
-        if search_used and not valid_results:
-            lines.append("\n*Web search was unavailable, so the answer is based only on the uploaded CSV.*")
+        lines.append("")
+        lines.append("**Sources**")
+        for src in state.sources:
+            title = src.get("title", "Untitled")
+            url = src.get("url", "")
+            lines.append(f"- [{title}]({url})")
 
     answer = "\n\n".join(lines) if lines else "Analysis completed with no findings."
     steps.append("Composing final answer")
