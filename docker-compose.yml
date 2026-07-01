@@ -1,0 +1,36 @@
+services:
+  backend:
+    build: ./backend
+    container_name: localdata-backend
+    ports:
+      - "8010:8000"
+    environment:
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      LLM_MODEL: qwen2.5-coder:7b
+      FALLBACK_MODEL: llama3.2:3b
+      LOG_DIR: /app/logs
+      MAX_EXECUTION_TIMEOUT: "30"
+      MAX_CSV_SIZE_MB: "50"
+    volumes:
+      - ./logs:/app/logs
+      - ./uploads:/app/uploads
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  frontend:
+    build: ./frontend
+    container_name: localdata-frontend
+    ports:
+      - "8505:8501"
+    environment:
+      BACKEND_API_URL: http://backend:8000
+    depends_on:
+      backend:
+        condition: service_started
+    restart: unless-stopped

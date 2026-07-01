@@ -1,10 +1,11 @@
+import os
 from urllib.parse import urlparse
 
 import pandas as pd
 import requests
 import streamlit as st
 
-API_BASE = "http://localhost:8000"
+API_BASE = os.environ.get("BACKEND_API_URL", "http://127.0.0.1:8010")
 EXPECTED_HEALTH_FIELDS = {"status", "model"}
 
 

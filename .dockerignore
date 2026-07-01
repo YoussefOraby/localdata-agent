@@ -1,0 +1,16 @@
+.git
+.gitignore
+.venv
+venv
+__pycache__
+*.pyc
+.env
+.env.example
+logs/*
+!logs/.gitkeep
+uploads/*
+!uploads/.gitkeep
+.pytest_cache
+.streamlit
+.DS_Store
+node_modules
