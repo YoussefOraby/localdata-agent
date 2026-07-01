@@ -42,7 +42,40 @@ def test_max_types_limit():
     types, explanation = _keyword_route(
         "summarize show chart missing values best worst"
     )
-    assert len(types) <= 3
+    assert len(types) <= 4
+
+
+def test_keyword_routes_web_search():
+    types, explanation = _keyword_route("search for recent e-commerce trends")
+    assert "web_search" in types
+    assert isinstance(explanation, str)
+
+
+def test_keyword_routes_web_search_latest():
+    types, explanation = _keyword_route("find latest strategies for sales improvement")
+    assert "web_search" in types
+
+
+def test_keyword_routes_combined_csv_and_search():
+    types, explanation = _keyword_route("summarize and search for current market trends")
+    assert "summary" in types
+    assert "web_search" in types
+    assert len(types) <= 4
+
+
+def test_keyword_routes_search_only():
+    types, explanation = _keyword_route("search the web for external information")
+    assert "web_search" in types
+
+
+def test_keyword_routes_search_with_chart():
+    types, explanation = _keyword_route("visualize this and search for current trends")
+    assert "basic_chart" in types or "web_search" in types
+
+
+def test_route_question_no_llm_web_search():
+    types, explanation = _keyword_route("search for current e-commerce growth trends")
+    assert "web_search" in types
 
 
 def test_route_question_no_llm():

@@ -8,14 +8,15 @@ from app.llm.ollama_client import OllamaClient
 
 logger = logging.getLogger(__name__)
 
-ALLOWED_TYPES = {"summary", "missing_outliers", "best_worst", "basic_chart"}
-MAX_TYPES = 3
+ALLOWED_TYPES = {"summary", "missing_outliers", "best_worst", "basic_chart", "web_search"}
+MAX_TYPES = 4
 
 KEYWORD_RULES = [
     ({"best", "worst", "highest", "lowest", "max", "min", "top", "bottom", "extreme", "peak", "record"}, "best_worst"),
     ({"chart", "plot", "visualize", "trend", "graph", "visual", "visualization", "distribution"}, "basic_chart"),
     ({"missing", "null", "empty", "outlier", "data quality", "completeness", "gaps", "nan", "blank", "incomplete"}, "missing_outliers"),
     ({"summarize", "summary", "overview", "describe", "describe", "general", "show me"}, "summary"),
+    ({"search", "recent", "current", "latest", "market trend", "industry trend", "strategies", "compare with market", "external", "online", "web"}, "web_search"),
 ]
 
 
@@ -81,7 +82,7 @@ def _keyword_route(question: str) -> tuple[list[str], str]:
                 matched.add(analysis_type)
                 break
 
-    ordered = [t for t in ["summary", "missing_outliers", "best_worst", "basic_chart"] if t in matched]
+    ordered = [t for t in ["summary", "missing_outliers", "best_worst", "basic_chart", "web_search"] if t in matched]
 
     if not ordered:
         ordered = ["summary"]

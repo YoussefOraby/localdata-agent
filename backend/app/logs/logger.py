@@ -53,6 +53,9 @@ class JSONLLogger:
             "error": data.get("error"),
             "execution_time_seconds": data.get("execution_time_seconds"),
             "tool_used": "langgraph_agent",
+            "search_used": "web_search" in (data.get("selected_analysis_types") or []),
+            "search_query": data.get("search_query"),
+            "sources_count": len(data.get("sources") or []),
         }
         try:
             with open(self.log_path, "a", encoding="utf-8") as f:

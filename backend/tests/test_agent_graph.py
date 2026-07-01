@@ -17,7 +17,7 @@ def sample_csv_bytes():
 def test_router_returns_summary_for_general_question():
     types, explanation = route_question("summarize this dataset")
     assert "summary" in types
-    assert len(types) <= 3
+    assert len(types) <= 4
 
 
 def test_router_returns_missing_outliers_for_quality_question():
@@ -66,3 +66,36 @@ def test_agent_runs_multiple_analyses(sample_csv_bytes):
     for atype in ("summary", "missing_outliers", "best_worst", "basic_chart"):
         result = analyzer.analyze(sample_csv_bytes, "test.csv", atype)
         assert result["success"] is True, f"{atype} failed"
+
+
+def test_router_returns_web_search_for_search_question():
+    types, explanation = route_question("search for current e-commerce trends")
+    assert "web_search" in types
+    assert len(types) <= 4
+
+
+def test_router_returns_combined_csv_and_search():
+    types, explanation = route_question("summarize this dataset and search for sales strategies")
+    csv_types = {"summary", "missing_outliers", "best_worst", "basic_chart", "web_search"}
+    assert all(t in csv_types for t in types)
+    assert "web_search" in types or "summary" in types
+
+
+def test_router_returns_summary_with_search():
+    types, explanation = route_question("search for current data quality best practices")
+    assert "web_search" in types
+
+    types2, explanation2 = route_question("find missing values and search for current e-commerce growth trends")
+    assert "missing_outliers" in types2 or "web_search" in types2
+
+
+def test_clean_search_query_removes_csv_refs():
+    from app.agent.graph import _clean_search_query
+    result = _clean_search_query("Summarize this CSV and search for current trends")
+    assert "this csv" not in result.lower()
+
+
+def test_clean_search_query_keeps_question_intent():
+    from app.agent.graph import _clean_search_query
+    result = _clean_search_query("search for current e-commerce growth trends")
+    assert "e-commerce" in result or "growth" in result

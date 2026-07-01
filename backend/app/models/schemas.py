@@ -3,7 +3,7 @@ from typing import Any, Literal, Optional
 from pydantic import BaseModel
 
 
-AnalysisType = Literal["summary", "missing_outliers", "best_worst", "basic_chart"]
+AnalysisType = Literal["summary", "missing_outliers", "best_worst", "basic_chart", "web_search"]
 
 
 class AnalyzeRequest(BaseModel):
@@ -32,6 +32,9 @@ class AgentAnalyzeResponse(BaseModel):
     file_name: Optional[str] = None
     selected_analysis_types: list[str] = []
     results: list[dict] = []
+    search_results: list[dict] = []
+    search_query: Optional[str] = None
+    sources: list[dict] = []
     final_answer: Optional[str] = None
     chart: Optional[dict] = None
     steps: list[str] = []

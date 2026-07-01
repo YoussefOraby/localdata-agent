@@ -9,6 +9,9 @@ class AgentState:
     file_name: str
     selected_analysis_types: list[str] = field(default_factory=list)
     results: list[dict] = field(default_factory=list)
+    search_results: list[dict] = field(default_factory=list)
+    search_query: Optional[str] = None
+    sources: list[dict] = field(default_factory=list)
     final_answer: Optional[str] = None
     steps: list[str] = field(default_factory=list)
     error: Optional[str] = None

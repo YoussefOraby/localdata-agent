@@ -7,8 +7,17 @@ from app.agent.router import route_question
 from app.agent.state import AgentState
 from app.analysis.csv_analyzer import CSVAnalyzer
 from app.llm.ollama_client import OllamaClient
+from app.search.web_search import WebSearchTool
 
 logger = logging.getLogger(__name__)
+
+
+def _clean_search_query(question: str) -> str:
+    q = question.lower()
+    for phrase in ["this csv", "this dataset", "this data", "uploaded file", "my csv", "my dataset"]:
+        q = q.replace(phrase, "")
+    q = q.strip().strip(".,!?;:").strip()
+    return q if q else question
 
 
 def _route_question_node(state: AgentState) -> dict:
@@ -28,8 +37,34 @@ def _run_analyses(state: AgentState) -> dict:
     results = []
     steps = state.steps[:]
     all_charts = []
+    search_results = []
+    search_query = None
+    sources = []
 
     for atype in state.selected_analysis_types:
+        if atype == "web_search":
+            search_query = _clean_search_query(state.question)
+            steps.append(f"Searching web for: {search_query}")
+            tool = WebSearchTool()
+            sr = tool.search(search_query)
+            if sr.success:
+                for item in sr.results:
+                    search_results.append({
+                        "title": item.title,
+                        "url": item.url,
+                        "snippet": item.snippet,
+                    })
+                    sources.append({
+                        "title": item.title,
+                        "url": item.url,
+                        "snippet": item.snippet,
+                    })
+                steps.append(f"Found {len(sr.results)} web results")
+            else:
+                search_results.append({"error": sr.error or "Web search failed"})
+                steps.append(f"Web search unavailable: {sr.error}")
+            continue
+
         try:
             steps.append(f"Running {atype} analysis")
             r = analyzer.analyze(state.file_bytes, state.file_name, atype)
@@ -50,6 +85,9 @@ def _run_analyses(state: AgentState) -> dict:
     return {
         "results": results,
         "steps": steps,
+        "search_results": search_results,
+        "search_query": search_query,
+        "sources": sources,
     }
 
 
@@ -59,7 +97,7 @@ def _compose_answer(state: AgentState) -> dict:
     if state.error:
         return {"final_answer": f"Analysis failed: {state.error}", "steps": steps}
 
-    if not state.results:
+    if not state.results and not state.search_results:
         return {"final_answer": "No analysis results were produced.", "steps": steps}
 
     lines = []
@@ -72,6 +110,21 @@ def _compose_answer(state: AgentState) -> dict:
             atype = r.get("analysis_type", "unknown")
             err = r.get("error", "unknown error")
             lines.append(f"{atype} analysis failed: {err}")
+
+    if state.search_results and any("error" not in r for r in state.search_results):
+        valid_results = [r for r in state.search_results if "error" not in r]
+        if valid_results:
+            lines.append("\n**Web context:**")
+            for r in valid_results[:3]:
+                snippet = (r.get("snippet") or "")[:200]
+                lines.append(f"- {r.get('title', '')}: {snippet}")
+            if state.search_query:
+                lines.append(f"\nSearch query used: {state.search_query}")
+
+    if state.sources:
+        search_used = any("web_search" in s for s in (state.selected_analysis_types or []))
+        if search_used and not valid_results:
+            lines.append("\n*Web search was unavailable, so the answer is based only on the uploaded CSV.*")
 
     answer = "\n\n".join(lines) if lines else "Analysis completed with no findings."
     steps.append("Composing final answer")
@@ -122,6 +175,9 @@ def run_agent(file_bytes: bytes, file_name: str, question: str) -> dict:
             "file_name": file_name,
             "selected_analysis_types": final_state.get("selected_analysis_types", []),
             "results": results,
+            "search_results": final_state.get("search_results", []),
+            "search_query": final_state.get("search_query"),
+            "sources": final_state.get("sources", []),
             "final_answer": final_state.get("final_answer"),
             "chart": chart,
             "steps": final_state.get("steps", []),
@@ -137,6 +193,9 @@ def run_agent(file_bytes: bytes, file_name: str, question: str) -> dict:
             "file_name": file_name,
             "selected_analysis_types": [],
             "results": [],
+            "search_results": [],
+            "search_query": None,
+            "sources": [],
             "final_answer": None,
             "chart": None,
             "steps": [f"Agent error: {e}"],

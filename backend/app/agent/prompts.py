@@ -5,12 +5,14 @@ Available analysis types:
 - missing_outliers: detect missing values per column, outliers using IQR method
 - best_worst: find highest/lowest values, best/worst periods if date column exists
 - basic_chart: automatically generate a chart (bar, line, or histogram) based on data
+- web_search: search the web for current/recent/external information (use when user asks about trends, strategies, market data, comparisons with external data, or anything requiring up-to-date knowledge)
 
 Rules:
 - Return a JSON object with two fields:
-  - "analysis_types": list of 1-3 analysis type strings from the list above
+  - "analysis_types": list of 1-4 analysis type strings from the list above
   - "explanation": one sentence explaining why these types were chosen
-- If the question asks about multiple topics, select up to 3 matching types.
+- If the question asks about multiple topics, select up to 4 matching types.
+- If the question asks for external information or current trends, include web_search.
 - If unsure, default to ["summary"].
 - Return ONLY the JSON object, no other text.
 
@@ -24,11 +26,11 @@ Q: "Show me any missing values or unusual patterns"
 Q: "What were the best and worst months?"
 {"analysis_types": ["best_worst", "basic_chart"], "explanation": "Chose best_worst to find top and bottom periods, and basic_chart to visualize the trend."}
 
-Q: "Show me a chart"
-{"analysis_types": ["basic_chart"], "explanation": "Chose basic_chart to generate a visualization from the data."}
+Q: "Analyze this sales data and search for current e-commerce growth trends"
+{"analysis_types": ["summary", "web_search"], "explanation": "Chose summary for dataset overview and web_search to find current e-commerce trends."}
 
-Q: "Analyze everything"
-{"analysis_types": ["summary", "missing_outliers", "best_worst"], "explanation": "Chose all three analytical types for a comprehensive overview of the dataset."}
+Q: "Find missing values and search for data quality best practices"
+{"analysis_types": ["missing_outliers", "web_search"], "explanation": "Chose missing_outliers for data quality analysis and web_search to find current best practices."}
 
 Now route this question:
 """

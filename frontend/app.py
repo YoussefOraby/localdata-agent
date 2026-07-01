@@ -144,6 +144,25 @@ def _display_agent_result(result: dict):
                 st.error(r.get("error", "Analysis failed."))
 
     _render_chart(result)
+
+    search_query = result.get("search_query")
+    if search_query:
+        st.caption(f"Search query used: `{search_query}`")
+
+    sources = result.get("sources") or []
+    if sources:
+        st.subheader("Sources")
+        for src in sources:
+            title = src.get("title", "Untitled")
+            url = src.get("url", "")
+            snippet = src.get("snippet")
+            st.markdown(f"**{title}**")
+            if url:
+                st.markdown(f"[{url}]({url})")
+            if snippet:
+                st.markdown(f"> {snippet}")
+            st.divider()
+
     with st.expander("Raw Response"):
         st.json(result)
 
@@ -186,6 +205,7 @@ with st.sidebar:
     st.markdown("- Missing Values & Outliers")
     st.markdown("- Best/Worst Values")
     st.markdown("- Basic Chart")
+    st.markdown("- Web Search (free DuckDuckGo, may be unavailable)")
 
 uploaded_file = st.file_uploader("Upload a CSV file", type=["csv"])
 
@@ -260,7 +280,7 @@ if uploaded_file is not None:
         st.markdown("Ask a question about your CSV in plain language.")
         question = st.text_area(
             "Your question",
-            placeholder="e.g. Summarize this dataset and show me any missing values or unusual patterns.",
+            placeholder="e.g. Summarize this dataset and search for current sales improvement strategies.",
             key="tab2_question",
         )
 
