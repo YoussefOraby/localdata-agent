@@ -17,8 +17,33 @@ def _clean_search_query(question: str) -> str:
     q = question.lower()
     for phrase in ["this csv", "this dataset", "this data", "uploaded file", "my csv", "my dataset"]:
         q = q.replace(phrase, "")
-    q = q.strip().strip(".,!?;:").strip()
+    search_markers = ["search for", "look up", "find", "search"]
+    for marker in sorted(search_markers, key=len, reverse=True):
+        if marker in q:
+            idx = q.index(marker) + len(marker)
+            q = q[idx:].strip()
+            break
+    q = re.sub(r"^(current|recent|latest|online|web|the)\s+", "", q)
+    q = re.sub(r"\s+", " ", q).strip()
+    q = q.strip(".,!?;:-").strip()
     return q if q else question
+
+
+def _generate_fallback_queries(query: str) -> list[str]:
+    words = query.split()
+    fallbacks = []
+    if len(words) > 3:
+        fallbacks.append(" ".join(words[1:]))
+        fallbacks.append(" ".join(words[-3:]))
+    if len(words) > 2:
+        fallbacks.append(" ".join(words[-2:]))
+    seen = set()
+    unique = []
+    for f in fallbacks:
+        if f not in seen and f != query:
+            seen.add(f)
+            unique.append(f)
+    return unique[:3]
 
 
 def _route_question_node(state: AgentState) -> dict:
@@ -45,25 +70,35 @@ def _run_analyses(state: AgentState) -> dict:
     for atype in state.selected_analysis_types:
         if atype == "web_search":
             search_query = _clean_search_query(state.question)
-            steps.append(f"Searching web for: {search_query}")
+            queries_to_try = [search_query] + _generate_fallback_queries(search_query)
             tool = WebSearchTool()
-            sr = tool.search(search_query)
-            if sr.success:
-                for item in sr.results:
-                    search_results.append({
-                        "title": item.title,
-                        "url": item.url,
-                        "snippet": item.snippet,
-                    })
-                    sources.append({
-                        "title": item.title,
-                        "url": item.url,
-                        "snippet": item.snippet,
-                    })
-                steps.append(f"Found {len(sr.results)} web results")
-            else:
-                search_results.append({"error": sr.error or "Web search failed"})
-                steps.append(f"Web search unavailable: {sr.error}")
+            for attempt, q in enumerate(queries_to_try):
+                steps.append(f"Searching web: {q}" if attempt == 0 else f"Retrying with broader query: {q}")
+                sr = tool.search(q)
+                if sr.success and sr.results:
+                    for item in sr.results:
+                        search_results.append({
+                            "title": item.title,
+                            "url": item.url,
+                            "snippet": item.snippet,
+                        })
+                        sources.append({
+                            "title": item.title,
+                            "url": item.url,
+                            "snippet": item.snippet,
+                        })
+                    steps.append(f"Found {len(sr.results)} web results")
+                    search_query = q
+                    break
+                elif sr.success and not sr.results and attempt == len(queries_to_try) - 1:
+                    steps.append("Web search returned no results")
+                elif not sr.success and attempt == len(queries_to_try) - 1:
+                    search_results.append({"error": sr.error or "Web search failed"})
+                    steps.append(f"Web search unavailable: {sr.error}")
+                elif sr.success and not sr.results:
+                    continue
+                else:
+                    continue
             continue
 
         try:
@@ -126,8 +161,10 @@ def _compose_answer(state: AgentState) -> dict:
                 lines.append(f"- {atype} analysis failed: {err}")
 
     valid_results = []
+    has_search_error = False
     if state.search_results:
         valid_results = [r for r in state.search_results if "error" not in r]
+        has_search_error = any("error" in r for r in state.search_results)
 
     if valid_results:
         lines.append("")
@@ -144,7 +181,10 @@ def _compose_answer(state: AgentState) -> dict:
     search_used = "web_search" in (state.selected_analysis_types or [])
     if search_used and not valid_results:
         lines.append("")
-        lines.append("*Web search was unavailable, so the answer is based only on the uploaded CSV.*")
+        if has_search_error:
+            lines.append("*Web search was unavailable, so the answer is based only on the uploaded CSV.*")
+        else:
+            lines.append("*Web search returned no results. Try a broader question.*")
 
     if state.sources:
         lines.append("")

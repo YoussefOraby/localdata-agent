@@ -150,6 +150,7 @@ def _display_agent_result(result: dict):
         st.caption(f"Search query used: `{search_query}`")
 
     sources = result.get("sources") or []
+    selected = result.get("selected_analysis_types", [])
     if sources:
         st.subheader("Sources")
         for src in sources:
@@ -162,6 +163,8 @@ def _display_agent_result(result: dict):
             if snippet:
                 st.markdown(f"> {snippet}")
             st.divider()
+    elif "web_search" in selected:
+        st.warning("No web results found. Try a broader question.")
 
     with st.expander("Raw Response"):
         st.json(result)

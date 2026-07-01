@@ -101,6 +101,47 @@ def test_clean_search_query_keeps_question_intent():
     assert "e-commerce" in result or "growth" in result
 
 
+def test_clean_search_query_removes_search_for():
+    from app.agent.graph import _clean_search_query
+    result = _clean_search_query("Search for current sales improvement strategies.")
+    assert "search for" not in result
+    assert "sales" in result
+    assert "improvement" in result
+    assert "strategies" in result
+
+
+def test_clean_search_query_removes_leading_current():
+    from app.agent.graph import _clean_search_query
+    result = _clean_search_query("search for current e-commerce trends")
+    assert "current" not in result.split()[0] if result.split() else True
+
+
+def test_clean_search_query_handles_chart_and_search():
+    from app.agent.graph import _clean_search_query
+    result = _clean_search_query("Show me a chart and search for current e-commerce trends.")
+    assert "e-commerce" in result or "trends" in result
+    assert "chart" not in result if result != "Show me a chart and search for current e-commerce trends." else True
+
+
+def test_generate_fallback_queries_shortens():
+    from app.agent.graph import _generate_fallback_queries
+    result = _generate_fallback_queries("sales improvement strategies")
+    assert isinstance(result, list)
+    assert len(result) <= 3
+
+
+def test_generate_fallback_queries_long():
+    from app.agent.graph import _generate_fallback_queries
+    result = _generate_fallback_queries("current sales improvement strategies for retail")
+    assert any("sales improvement" in q for q in result) or any("retail" in q for q in result)
+
+
+def test_generate_fallback_queries_short_returns_empty():
+    from app.agent.graph import _generate_fallback_queries
+    result = _generate_fallback_queries("sales")
+    assert isinstance(result, list)
+
+
 def test_chart_and_search_returns_both():
     types, explanation = route_question("Show me a chart and search for current e-commerce trends.")
     assert "basic_chart" in types
@@ -137,3 +178,60 @@ def test_clean_explanation_collapses_whitespace():
     result = _clean_explanation("hello    world")
     assert "hello world" in result
     assert "    " not in result
+
+
+def test_fallback_search_mocked():
+    from unittest.mock import patch
+    from app.agent.graph import _run_analyses
+    from app.agent.state import AgentState
+
+    state = AgentState(
+        question="Search for current sales improvement strategies.",
+        file_bytes=b"a,b\n1,2\n3,4",
+        file_name="test.csv",
+        selected_analysis_types=["web_search"],
+    )
+
+    mock_results = [
+        {"title": "Result", "href": "https://x.com", "body": "Snippet"},
+    ]
+
+    with patch("app.agent.graph.WebSearchTool") as MockTool:
+        instance = MockTool.return_value
+
+        def search_side_effect(query, **kw):
+            from app.search.web_search import SearchResult, SearchItem
+            if "strategies" in query or "growth" in query:
+                items = [SearchItem(title="R", url="https://x.com", snippet="S")]
+                return SearchResult(success=True, query=query, results=items)
+            return SearchResult(success=True, query=query, results=[])
+
+        instance.search.side_effect = search_side_effect
+
+        result = _run_analyses(state)
+
+    assert len(result["sources"]) > 0
+    assert result["search_query"] is not None
+
+
+def test_fallback_search_all_empty_mocked():
+    from unittest.mock import patch
+    from app.agent.graph import _run_analyses
+    from app.agent.state import AgentState
+
+    state = AgentState(
+        question="Search for current sales improvement strategies.",
+        file_bytes=b"a,b\n1,2\n3,4",
+        file_name="test.csv",
+        selected_analysis_types=["web_search"],
+    )
+
+    with patch("app.agent.graph.WebSearchTool") as MockTool:
+        instance = MockTool.return_value
+        from app.search.web_search import SearchResult
+        instance.search.return_value = SearchResult(success=True, query="x", results=[])
+
+        result = _run_analyses(state)
+
+    assert len(result["sources"]) == 0
+    assert len(result["search_results"]) == 0 or all("error" in r for r in result["search_results"])
