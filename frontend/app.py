@@ -39,6 +39,64 @@ def _render_chart(result: dict):
         st.caption(f"{chart.get('title', '')} | X: {chart.get('x_label', '')}, Y: {chart.get('y_label', '')}")
 
 
+def _display_multi_agent_result(result: dict):
+    if not result.get("success"):
+        st.error(result.get("error", "Multi-agent analysis failed."))
+        return
+
+    st.subheader("Multi-Agent Results")
+
+    agents = result.get("agents_used", [])
+    if agents:
+        st.info(f"Agents used: {', '.join(agents)}")
+
+    selected = result.get("selected_analysis_types", [])
+    if selected:
+        st.caption(f"Selected tools: {', '.join(selected)}")
+
+    review = result.get("review")
+    if review:
+        if review.get("passed"):
+            st.success("Review: all checks passed")
+        else:
+            st.warning(f"Review: {'; '.join(review.get('notes', []))}")
+
+    steps = result.get("steps", [])
+    _render_steps(steps)
+
+    if result.get("execution_time_seconds") is not None:
+        st.caption(f"Execution time: {result['execution_time_seconds']:.2f}s")
+
+    final_answer = result.get("final_answer")
+    if final_answer:
+        st.markdown(final_answer)
+
+    _render_chart(result)
+
+    search_query = result.get("search_query")
+    if search_query:
+        st.caption(f"Search query used: `{search_query}`")
+
+    sources = result.get("sources") or []
+    if sources:
+        st.subheader("Sources")
+        for src in sources:
+            title = src.get("title", "Untitled")
+            url = src.get("url", "")
+            snippet = src.get("snippet")
+            st.markdown(f"**{title}**")
+            if url:
+                st.markdown(f"[{url}]({url})")
+            if snippet:
+                st.markdown(f"> {snippet}")
+            st.divider()
+    elif "web_search" in selected:
+        st.warning("No web results found. Try a broader question.")
+
+    with st.expander("Raw Response"):
+        st.json(result)
+
+
 def _display_template_result(result: dict):
     if not result.get("success"):
         st.error(result.get("explanation", "Analysis failed."))
@@ -185,9 +243,11 @@ with st.sidebar:
     api_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}" if parsed.scheme else raw_url.rstrip("/")
     analyze_url = f"{api_url}/analyze"
     agent_url = f"{api_url}/agent/analyze"
+    multi_agent_url = f"{api_url}/multi-agent/analyze"
 
     st.caption(f"`{analyze_url}`")
     st.caption(f"`{agent_url}`")
+    st.caption(f"`{multi_agent_url}`")
 
     try:
         r = requests.get(f"{api_url}/health", timeout=5)
@@ -243,7 +303,7 @@ if uploaded_file is not None:
 
     st.divider()
 
-    tab1, tab2 = st.tabs(["Template Analysis", "Ask Agent"])
+    tab1, tab2, tab3 = st.tabs(["Template Analysis", "Ask Agent", "Multi-Agent"])
 
     with tab1:
         analysis_type_map = {
@@ -309,6 +369,37 @@ if uploaded_file is not None:
                     st.stop()
 
             _display_agent_result(result)
+
+    with tab3:
+        st.markdown("Ask a multi-step question about your CSV.")
+        ma_question = st.text_area(
+            "Your question",
+            placeholder="e.g. Analyze this dataset, show a chart, and search for current improvement strategies.",
+            key="tab3_question",
+        )
+
+        if st.button("Run Multi-Agent", type="primary", key="tab3_btn"):
+            if not ma_question.strip():
+                st.warning("Please enter a question.")
+                st.stop()
+
+            with st.spinner("Multi-agent is working..."):
+                uploaded_file.seek(0)
+                files = {"file": (uploaded_file.name, uploaded_file.getvalue(), "text/csv")}
+                data = {"question": ma_question}
+
+                try:
+                    resp = requests.post(multi_agent_url, files=files, data=data, timeout=300)
+                    resp.raise_for_status()
+                    result = resp.json()
+                except requests.exceptions.ConnectionError:
+                    st.error(f"Cannot connect to backend at {multi_agent_url}. Make sure the backend is running.")
+                    st.stop()
+                except Exception as e:
+                    st.error(f"Request failed: {e}")
+                    st.stop()
+
+            _display_multi_agent_result(result)
 
 else:
     st.info("Upload a CSV file to get started.")

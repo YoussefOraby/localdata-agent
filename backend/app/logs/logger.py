@@ -63,6 +63,28 @@ class JSONLLogger:
         except Exception as e:
             logger.error("Failed to write log entry: %s", e)
 
+    def log_multi_agent_run(self, data: dict) -> None:
+        entry = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "mode": "multi_agent",
+            "file_name": data.get("file_name"),
+            "question": data.get("question"),
+            "agents_used": data.get("agents_used"),
+            "selected_analysis_types": data.get("selected_analysis_types"),
+            "success": data.get("success", False),
+            "error": data.get("error"),
+            "execution_time_seconds": data.get("execution_time_seconds"),
+            "tool_used": "multi_agent_workflow",
+            "search_used": "web_search" in (data.get("selected_analysis_types") or []),
+            "search_query": data.get("search_query"),
+            "sources_count": len(data.get("sources") or []),
+        }
+        try:
+            with open(self.log_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(entry, default=str) + "\n")
+        except Exception as e:
+            logger.error("Failed to write log entry: %s", e)
+
     def get_recent_runs(self, limit: int = 10) -> list[dict]:
         if not os.path.exists(self.log_path):
             return []
